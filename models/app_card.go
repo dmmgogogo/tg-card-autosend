@@ -39,7 +39,7 @@ func init() {
 func (c *AppCard) GetCardLimit(number int) (items []AppCard, err error) {
 	o := orm.NewOrm()
 	qs := o.QueryTable(c)
-	qs.Filter("status", 0).Limit(number).All(&items)
+	qs.Filter("status", 0).Limit(number).OrderBy("id").All(&items)
 	return items, nil
 }
 

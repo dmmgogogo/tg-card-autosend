@@ -13,6 +13,5 @@ func init() {
 	// API路由
 	web.Router("/api/cards", &controllers.ApiController{}, "get:GetCards")
 	web.Router("/api/card-history", &controllers.ApiController{}, "get:GetCardHistory")
-	web.Router("/api/export-cards", &controllers.ApiController{}, "post:ExportCards")
 	web.Router("/api/v1/card/upload", &controllers.CardController{}, "post:UploadCard")
 }
