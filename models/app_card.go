@@ -63,8 +63,9 @@ func (c *AppCard) GetCardUnused() (items []AppCard, err error) {
 func (c *AppCard) DeleteAllCard() (num int64, err error) {
 	o := orm.NewOrm()
 	qs := o.QueryTable(c)
-	num, err = qs.Delete()
+	num, err = qs.Filter("id__gt", 0).Delete()
 	if err != nil {
+		logs.Error("一键删除卡密失败: %v", err)
 		return 0, err
 	}
 	logs.Info("一键删除卡密成功, 删除数量: %d", num)

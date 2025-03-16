@@ -205,7 +205,7 @@ func (b *Bot) handleCallbackQuery(botAdmin, sendUserName string, sendUserId int6
 			sendMessage(b.api, callback.Message.Chat.ID, "一键删除失败")
 			callback_response.Text = "一键删除失败"
 		} else {
-			sendMessage(b.api, callback.Message.Chat.ID, fmt.Sprintf("一键删除成功, 删除数量: %d", num))
+			sendMessageWithReply(b.api, callback.Message.Chat.ID, fmt.Sprintf("一键删除成功, 删除数量: [%d]", num), callback.Message.MessageID)
 			callback_response.Text = "一键删除成功"
 		}
 	}
