@@ -9,3 +9,10 @@
 5. 设置机器人状态
 6. 启动机器人
 7. 查看历史记录
+
+## 如果对代码有疑问，可以联系我 @thismanisok
+
+## 如果愿意支持我，可以请我喝杯咖啡
+ETH：0x42b0A6181844BD7287a04c3DcaD68F7965c1cc1D
+TRX：TAVNdqk7wRTqtcdLKic5KhCeVtEtKjLDkn
+SOL:8oeqcTRGuMqhR1BwTdYuPef1AKRDx2zvcJNteiSeWJF6
