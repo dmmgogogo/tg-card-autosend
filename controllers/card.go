@@ -19,6 +19,12 @@ type CardController struct {
 }
 
 func (c *CardController) Index() {
+	// 加个key校验
+	if c.GetString("call") != "thismanisok" {
+		c.Ctx.WriteString("@thismanisok 有需求tg联系他")
+		return
+	}
+
 	o := orm.NewOrm()
 
 	// 获取页码

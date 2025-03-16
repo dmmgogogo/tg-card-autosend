@@ -51,6 +51,26 @@ func (c *AppCard) GetCardLimit(number int) (items []AppCard, err error) {
 	return items, nil
 }
 
+// GetCardUnused 获取全部未使用卡密
+func (c *AppCard) GetCardUnused() (items []AppCard, err error) {
+	o := orm.NewOrm()
+	qs := o.QueryTable(c)
+	qs.Filter("status", 0).OrderBy("id").All(&items)
+	return items, nil
+}
+
+// 一键删除
+func (c *AppCard) DeleteAllCard() (num int64, err error) {
+	o := orm.NewOrm()
+	qs := o.QueryTable(c)
+	num, err = qs.Delete()
+	if err != nil {
+		return 0, err
+	}
+	logs.Info("一键删除卡密成功, 删除数量: %d", num)
+	return num, nil
+}
+
 // 批量更新卡密状态
 func (c *AppCard) UpdateCardStatus(ids []int64) (err error) {
 	o := orm.NewOrm()

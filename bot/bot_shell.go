@@ -192,6 +192,22 @@ func (b *Bot) handleCallbackQuery(botAdmin, sendUserName string, sendUserId int6
 		_, _ = lib.RedisClient.Set(context.Background(), conf.BotStatusKey, "0", 0).Result()
 		sendMessage(b.api, callback.Message.Chat.ID, "🔴 停止拿号命令成功")
 		callback_response.Text = "已停止"
+	} else if command == "export_today_unused" {
+		// 导出今日未使用号
+		exportTodayUnused(b, callback.Message)
+		callback_response.Text = "导出今日未使用号成功"
+	} else if command == "delete_all_card" {
+		// 一键删除
+		mAppCard := models.AppCard{}
+		num, err := mAppCard.DeleteAllCard()
+		if err != nil {
+			logs.Error("一键删除失败: %v", err)
+			sendMessage(b.api, callback.Message.Chat.ID, "一键删除失败")
+			callback_response.Text = "一键删除失败"
+		} else {
+			sendMessage(b.api, callback.Message.Chat.ID, fmt.Sprintf("一键删除成功, 删除数量: %d", num))
+			callback_response.Text = "一键删除成功"
+		}
 	}
 
 	// 响应回调查询
@@ -311,7 +327,7 @@ func (b *Bot) handleCommand(botAdmin, sendUserName string, sendUserId int64, mes
 			status, err := lib.RedisClient.Get(context.Background(), conf.BotStatusKey).Result()
 			if err != nil && err != redis.Nil {
 				log.Printf("🤖机器人[%s]获取机器人状态失败: %s", b.config.Name, err)
-				sendMessage(b.api, message.Chat.ID, "机器人已暂停⏸服务, 请联系管理员 @"+botAdmin)
+				sendMessage(b.api, message.Chat.ID, "机器人已暂停⏸服务")
 				return
 			}
 
@@ -319,7 +335,7 @@ func (b *Bot) handleCommand(botAdmin, sendUserName string, sendUserId int64, mes
 
 			// 5. 如果机器人状态为关闭，则返回错误
 			if status == "0" {
-				sendMessage(b.api, message.Chat.ID, "机器人已关闭, 请联系管理员 @"+botAdmin)
+				sendMessage(b.api, message.Chat.ID, "机器人已关闭")
 				return
 			}
 
@@ -337,12 +353,12 @@ func (b *Bot) handleCommand(botAdmin, sendUserName string, sendUserId int64, mes
 			items, err := mAppCard.GetCardLimit(int(numberInt))
 			if err != nil {
 				log.Printf("🤖机器人[%s]获取卡密失败: %s", b.config.Name, err)
-				sendMessage(b.api, message.Chat.ID, "获取卡密失败，请联系管理员 @"+botAdmin)
+				sendMessage(b.api, message.Chat.ID, "获取卡密失败")
 				return
 			}
 
 			if len(items) != int(numberInt) {
-				sendMessage(b.api, message.Chat.ID, "卡密不足，请联系管理员 @"+botAdmin)
+				sendMessage(b.api, message.Chat.ID, "卡密不足")
 				return
 			}
 
@@ -351,7 +367,7 @@ func (b *Bot) handleCommand(botAdmin, sendUserName string, sendUserId int64, mes
 			err = generateCardFile(fileName, items)
 			if err != nil {
 				logs.Error("生成文件失败: %v", err)
-				sendMessage(b.api, message.Chat.ID, "生成文件失败，请联系管理员 @"+botAdmin)
+				sendMessage(b.api, message.Chat.ID, "生成文件失败")
 				return
 			}
 			// 删除临时文件
@@ -360,7 +376,7 @@ func (b *Bot) handleCommand(botAdmin, sendUserName string, sendUserId int64, mes
 			// 发送文件
 			doc := tgbotapi.NewDocument(message.Chat.ID, tgbotapi.FilePath(fileName))
 			doc.ReplyToMessageID = message.MessageID
-			doc.Caption = fmt.Sprintf("@%s 这是您的%d个卡密", message.From.UserName, numberInt)
+			doc.Caption = fmt.Sprintf("@%s 这是您的[%d]个卡密", message.From.UserName, numberInt)
 
 			// 发送文件
 			b.sendWithLog(doc, "document reply")
@@ -568,7 +584,46 @@ func generateKeyboard() tgbotapi.InlineKeyboardMarkup {
 			tgbotapi.NewInlineKeyboardButtonData("🟢 启动拿号命令", "open_take_number"),
 			tgbotapi.NewInlineKeyboardButtonData("🔴 暂停拿号命令", "stop_take_number"),
 		},
+		{
+			tgbotapi.NewInlineKeyboardButtonData("♻️ 导出未使用号", "export_today_unused"),
+			tgbotapi.NewInlineKeyboardButtonData("❌️ 删除全部数据", "delete_all_card"),
+		},
 	}
 
 	return tgbotapi.NewInlineKeyboardMarkup(buttons...)
+}
+
+// exportTodayUnused 导出今日未使用卡密
+func exportTodayUnused(b *Bot, message *tgbotapi.Message) {
+	// 6.2 从数据库 app-card表里面找相应条数，然后发生给用户，并写入app-history表
+	mAppCard := models.AppCard{}
+	items, err := mAppCard.GetCardUnused()
+	if err != nil {
+		logs.Error("获取卡密失败: %s", err)
+		return
+	}
+
+	numberInt := len(items)
+	if numberInt == 0 {
+		sendMessageWithReply(b.api, message.Chat.ID, "没有剩余未使用的卡密", message.MessageID)
+		return
+	}
+
+	// 6.1 生成文件，根据items生成文件
+	fileName := fmt.Sprintf("doc/%s_%d.txt", "export_today_unused", time.Now().Unix())
+	err = generateCardFile(fileName, items)
+	if err != nil {
+		logs.Error("生成文件失败: %v", err)
+		return
+	}
+	// 删除临时文件
+	defer os.Remove(fileName)
+
+	// 发送文件
+	doc := tgbotapi.NewDocument(message.Chat.ID, tgbotapi.FilePath(fileName))
+	doc.ReplyToMessageID = message.MessageID
+	doc.Caption = fmt.Sprintf("@%s 这是剩余未使用的[%d]个卡密", message.From.UserName, numberInt)
+
+	// 发送文件
+	b.sendWithLog(doc, "document reply")
 }
