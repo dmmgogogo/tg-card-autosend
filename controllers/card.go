@@ -20,8 +20,9 @@ type CardController struct {
 
 func (c *CardController) Index() {
 	// 加个key校验
-	if c.GetString("call") != "thismanisok" {
-		c.Ctx.WriteString("@thismanisok 有需求tg联系他")
+	call := c.GetString("call")
+	if call != "thismanisok" {
+		c.Ctx.WriteString("请联系管理员")
 		return
 	}
 
@@ -45,6 +46,7 @@ func (c *CardController) Index() {
 	_, _ = qs.Offset((historyPage - 1) * pageSize).Limit(pageSize).OrderBy("-id").All(&histories)
 
 	// 设置数据
+	c.Data["Call"] = call
 	c.Data["Cards"] = cards
 	c.Data["CardPage"] = page
 	c.Data["HasNextCard"] = (page * pageSize) < int(count)

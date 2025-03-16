@@ -204,7 +204,7 @@
                     {{range .Cards}}
                     <tr>
                       <td>{{.Id}}</td>
-                      <td title="{{.Txt}}" class="card-number">{{.Txt}}</td>
+                      <td class="ellipsis" title="{{.Txt}}">{{.Txt}}</td>
                       <td>
                         {{if eq .Status 0}}
                           <span class="badge bg-success">未使用</span>
@@ -230,12 +230,12 @@
               <ul class="pagination justify-content-center">
                 {{if gt .CardPage 1}}
                 <li class="page-item">
-                  <a class="page-link" href="?page={{subtract .CardPage 1}}">上一页</a>
+                  <a class="page-link" href="/?call={{.Call}}&page={{subtract .CardPage 1}}">上一页</a>
                 </li>
                 {{end}}
                 {{if .HasNextCard}}
                 <li class="page-item">
-                  <a class="page-link" href="?page={{add .CardPage 1}}">下一页</a>
+                  <a class="page-link" href="/?call={{.Call}}&page={{add .CardPage 1}}">下一页</a>
                 </li>
                 {{end}}
               </ul>
@@ -285,12 +285,12 @@
               <ul class="pagination justify-content-center">
                 {{if gt .HistoryPage 1}}
                 <li class="page-item">
-                  <a class="page-link" href="?historyPage={{subtract .HistoryPage 1}}">上一页</a>
+                  <a class="page-link" href="/?call={{.Call}}&historyPage={{subtract .HistoryPage 1}}">上一页</a>
                 </li>
                 {{end}}
                 {{if .HasNextHistory}}
                 <li class="page-item">
-                  <a class="page-link" href="?historyPage={{add .HistoryPage 1}}">下一页</a>
+                  <a class="page-link" href="/?call={{.Call}}&historyPage={{add .HistoryPage 1}}">下一页</a>
                 </li>
                 {{end}}
               </ul>
@@ -314,7 +314,7 @@
           const result = await response.json();
           if(result.success) {
             alert(result.message);
-            window.location.reload();
+            window.location.href = '/?call=thismanisok';
           } else {
             alert('上传失败: ' + result.message);
           }

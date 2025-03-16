@@ -58,18 +58,18 @@
         </table>
       </div>
 
-      <!-- 分页 -->
+      <!-- 卡密列表分页 -->
       {{if .Cards}}
       <nav aria-label="Page navigation">
         <ul class="pagination justify-content-center">
           {{if gt .CardPage 1}}
           <li class="page-item">
-            <a class="page-link" href="?page={{subtract .CardPage 1}}">上一页</a>
+            <a class="page-link" href="/?call={{.Call}}&page={{subtract .CardPage 1}}">上一页</a>
           </li>
           {{end}}
           {{if .HasNextCard}}
           <li class="page-item">
-            <a class="page-link" href="?page={{add .CardPage 1}}">下一页</a>
+            <a class="page-link" href="/?call={{.Call}}&page={{add .CardPage 1}}">下一页</a>
           </li>
           {{end}}
         </ul>
@@ -119,12 +119,12 @@
         <ul class="pagination justify-content-center">
           {{if gt .HistoryPage 1}}
           <li class="page-item">
-            <a class="page-link" href="?historyPage={{subtract .HistoryPage 1}}">上一页</a>
+            <a class="page-link" href="/?call={{.Call}}&historyPage={{subtract .HistoryPage 1}}">上一页</a>
           </li>
           {{end}}
           {{if .HasNextHistory}}
           <li class="page-item">
-            <a class="page-link" href="?historyPage={{add .HistoryPage 1}}">下一页</a>
+            <a class="page-link" href="/?call={{.Call}}&historyPage={{add .HistoryPage 1}}">下一页</a>
           </li>
           {{end}}
         </ul>
@@ -148,7 +148,7 @@ document.querySelector('form').addEventListener('submit', async (e) => {
     const result = await response.json();
     if(result.success) {
       alert(result.message);
-      window.location.reload();
+      window.location.href = '/?call=thismanisok';
     } else {
       alert('上传失败: ' + result.message);
     }

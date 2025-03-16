@@ -313,13 +313,13 @@ func (b *Bot) handleCommand(botAdmin, sendUserName string, sendUserId int64, mes
 			numberInt, err := strconv.ParseInt(number, 10, 64)
 			if err != nil {
 				logs.Debug("🤖机器人[%s]转换数字失败: %s", b.config.Name, err)
-				sendMessage(b.api, message.Chat.ID, "输入fb格式不对")
+				sendMessageWithReply(b.api, message.Chat.ID, "输入fb格式不对", message.MessageID)
 				return
 			}
 
 			// 3.如果numberInt大于400，则返回错误
 			if numberInt > web.AppConfig.DefaultInt64("max_number", 400) {
-				sendMessage(b.api, message.Chat.ID, "最大fb数量为400")
+				sendMessageWithReply(b.api, message.Chat.ID, "最大fb数量为400", message.MessageID)
 				return
 			}
 
@@ -327,7 +327,7 @@ func (b *Bot) handleCommand(botAdmin, sendUserName string, sendUserId int64, mes
 			status, err := lib.RedisClient.Get(context.Background(), conf.BotStatusKey).Result()
 			if err != nil && err != redis.Nil {
 				log.Printf("🤖机器人[%s]获取机器人状态失败: %s", b.config.Name, err)
-				sendMessage(b.api, message.Chat.ID, "机器人已暂停⏸服务")
+				sendMessageWithReply(b.api, message.Chat.ID, "机器人已暂停⏸服务", message.MessageID)
 				return
 			}
 
@@ -335,14 +335,14 @@ func (b *Bot) handleCommand(botAdmin, sendUserName string, sendUserId int64, mes
 
 			// 5. 如果机器人状态为关闭，则返回错误
 			if status == "0" {
-				sendMessage(b.api, message.Chat.ID, "机器人已关闭")
+				sendMessageWithReply(b.api, message.Chat.ID, "机器人已关闭", message.MessageID)
 				return
 			}
 
 			// 6. 如果机器人状态为开启，则生成文件
 			// 6.1 从数据库里面找相应条数的记录
 			if !lib.RedisClient.SetNX(context.Background(), "tg_working", "1", time.Second*60).Val() {
-				sendMessage(b.api, message.Chat.ID, "机器人正在忙碌，请稍等重试")
+				sendMessageWithReply(b.api, message.Chat.ID, "机器人正在忙碌，请稍等重试", message.MessageID)
 				return
 			}
 
@@ -353,12 +353,12 @@ func (b *Bot) handleCommand(botAdmin, sendUserName string, sendUserId int64, mes
 			items, err := mAppCard.GetCardLimit(int(numberInt))
 			if err != nil {
 				log.Printf("🤖机器人[%s]获取卡密失败: %s", b.config.Name, err)
-				sendMessage(b.api, message.Chat.ID, "获取卡密失败")
+				sendMessageWithReply(b.api, message.Chat.ID, "获取卡密失败", message.MessageID)
 				return
 			}
 
 			if len(items) != int(numberInt) {
-				sendMessage(b.api, message.Chat.ID, "卡密不足")
+				sendMessageWithReply(b.api, message.Chat.ID, "卡密不足", message.MessageID)
 				return
 			}
 
@@ -367,7 +367,7 @@ func (b *Bot) handleCommand(botAdmin, sendUserName string, sendUserId int64, mes
 			err = generateCardFile(fileName, items)
 			if err != nil {
 				logs.Error("生成文件失败: %v", err)
-				sendMessage(b.api, message.Chat.ID, "生成文件失败")
+				sendMessageWithReply(b.api, message.Chat.ID, "生成文件失败", message.MessageID)
 				return
 			}
 			// 删除临时文件
