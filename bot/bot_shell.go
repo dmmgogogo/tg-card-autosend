@@ -1,15 +1,22 @@
 package bot
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
+	"tg-card-autosed/conf"
+	"tg-card-autosed/lib"
 	"tg-card-autosed/models"
 	"time"
 
 	"github.com/beego/beego/v2/core/logs"
+	"github.com/beego/beego/v2/server/web"
+	"github.com/go-redis/redis/v8"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
@@ -163,20 +170,20 @@ func (b *Bot) Start() error {
 				}
 			} else {
 				// 处理文本消息
-				b.handleCommand(update.Message)
+				b.handleCommand(update.Message.From.UserName, update.Message.From.ID, update.Message)
 			}
 		}
 	}
 }
 
 // handleCommand 处理命令消息
-func (b *Bot) handleCommand(message *tgbotapi.Message) {
+func (b *Bot) handleCommand(sendUserName string, sendUserId int64, message *tgbotapi.Message) {
 	if b.config.ExpiresAt < time.Now().Unix() {
 		log.Printf("🤖机器人[%s]已过期", b.config.Name)
 		return
 	}
 
-	log.Printf("🤖机器人[%s]接收到消息: %s", b.config.Name, message.Text)
+	log.Printf("🤖机器人[%s]接收到来自用户[%s][%d]的消息: %s", b.config.Name, sendUserName, sendUserId, message.Text)
 
 	// 检查是否有任何内容需要处理
 	hasContent := message.Text != "" ||
@@ -196,41 +203,130 @@ func (b *Bot) handleCommand(message *tgbotapi.Message) {
 	// 检查是否包含关键词
 	if b.config.Keywords != "" {
 		// 说明只监控包含关键词的消息
-		isMatch := false
-		keywords := strings.Split(b.config.Keywords, ",")
-		for _, keyword := range keywords {
-			keyword = strings.TrimSpace(keyword)
-			if strings.Contains(message.Text, keyword) {
-				log.Printf("🤖机器人[%s]包含关键词: %s", b.config.Name, keyword)
-				isMatch = true
-				break
+		if !strings.Contains(message.Text, b.config.Keywords) {
+			logs.Debug("🤖机器人[%s]不包含关键词: %s", b.config.Name, b.config.Keywords)
+			return
+		} else {
+			logs.Debug("🤖机器人[%s]包含关键词: %s", b.config.Name, b.config.Keywords)
+
+			// TODO 关键词的默认固定格式是：10fb 或者 133fb ，需要根据关键词的格式进行处理
+			// 1. 获取关键词中的数字
+			number := strings.Split(message.Text, b.config.Keywords)[0]
+			logs.Debug("🤖机器人[%s]获取到用户[%s][%d]的数字: %s", b.config.Name, sendUserName, sendUserId, number)
+
+			// 2. 根据数字转成int64
+			numberInt, err := strconv.ParseInt(number, 10, 64)
+			if err != nil {
+				logs.Debug("🤖机器人[%s]转换数字失败: %s", b.config.Name, err)
+				sendMessage(b.api, message.Chat.ID, "输入fb格式不对")
+				return
+			}
+
+			// 3.如果numberInt大于400，则返回错误
+			if numberInt > web.AppConfig.DefaultInt64("max_number", 400) {
+				sendMessage(b.api, message.Chat.ID, "最大fb数量为400")
+				return
+			}
+
+			// 4. 根据数字生成文件，先判断当前机器人是否关闭
+			status, err := lib.RedisClient.Get(context.Background(), conf.BotStatusKey).Result()
+			if err != nil && err != redis.Nil {
+				log.Printf("🤖机器人[%s]获取机器人状态失败: %s", b.config.Name, err)
+				sendMessage(b.api, message.Chat.ID, "机器人已暂停⏸服务, 请联系管理员")
+				return
+			}
+
+			logs.Debug("🤖机器人[%s]状态: %s, 用户[%s][%d]， 领取数量: %d", b.config.Name, status, sendUserName, sendUserId, numberInt)
+
+			// 5. 如果机器人状态为关闭，则返回错误
+			if status == "0" {
+				sendMessage(b.api, message.Chat.ID, "机器人已关闭, 请联系管理员")
+				return
+			}
+
+			// 6. 如果机器人状态为开启，则生成文件
+			// 6.1 从数据库里面找相应条数的记录
+			if !lib.RedisClient.SetNX(context.Background(), "tg_working", "1", time.Second*60).Val() {
+				sendMessage(b.api, message.Chat.ID, "机器人正在忙碌，请稍等重试")
+				return
+			}
+
+			defer lib.RedisClient.Del(context.Background(), "tg_working")
+
+			// 6.2 从数据库 app-card表里面找相应条数，然后发生给用户，并写入app-history表
+			mAppCard := models.AppCard{}
+			items, err := mAppCard.GetCardLimit(int(numberInt))
+			if err != nil {
+				log.Printf("🤖机器人[%s]获取卡密失败: %s", b.config.Name, err)
+				sendMessage(b.api, message.Chat.ID, "获取卡密失败，请联系管理员")
+				return
+			}
+
+			if len(items) != int(numberInt) {
+				sendMessage(b.api, message.Chat.ID, "卡密不足，请联系管理员")
+				return
+			}
+
+			// 6.1 生成文件，根据items生成文件
+			fileName := fmt.Sprintf("doc/%d_%d.txt", sendUserId, time.Now().Unix())
+			err = generateCardFile(fileName, items)
+			if err != nil {
+				logs.Error("生成文件失败: %v", err)
+				sendMessage(b.api, message.Chat.ID, "生成文件失败，请联系管理员")
+				return
+			}
+			// 删除临时文件
+			defer os.Remove(fileName)
+
+			// 发送文件
+			doc := tgbotapi.NewDocument(message.Chat.ID, tgbotapi.FilePath(fileName))
+			doc.ReplyToMessageID = message.MessageID
+			doc.Caption = fmt.Sprintf("@%s 这是您的%d个卡密", message.From.UserName, numberInt)
+
+			// 发送文件
+			b.sendWithLog(doc, "document reply")
+
+			// 6.3 写入app-history表
+			mAppCardHistory := models.AppCardHistory{}
+			mAppCardHistory.InsertCardHistory(message.From.ID, message.From.UserName, items)
+
+			// 更新卡密状态
+			var ids []int64
+			for _, item := range items {
+				ids = append(ids, item.Id)
+			}
+			err = mAppCard.UpdateCardStatus(ids)
+			if err != nil {
+				logs.Error("更新卡密状态失败: %v", err)
 			}
 		}
+	}
+}
 
-		if !isMatch {
-			log.Printf("🤖机器人[%s]不包含关键词: %s", b.config.Name, message.Text)
-			return
+// generateCardFile 生成卡密文件
+func generateCardFile(fileName string, items []models.AppCard) error {
+	// 确保doc目录存在
+	err := os.MkdirAll("doc", 0755)
+	if err != nil {
+		return fmt.Errorf("创建目录失败: %v", err)
+	}
+
+	// 创建文件
+	file, err := os.Create(fileName)
+	if err != nil {
+		return fmt.Errorf("创建文件失败: %v", err)
+	}
+	defer file.Close()
+
+	// 写入卡密内容
+	for _, item := range items {
+		_, err := file.WriteString(item.Txt + "\n")
+		if err != nil {
+			return fmt.Errorf("写入文件失败: %v", err)
 		}
 	}
 
-	// 说明监控所有消息
-	// 发送文件作为回复
-	filePath := "data.txt" // 文件路径
-
-	// 创建文件发送配置
-	doc := tgbotapi.NewDocument(message.Chat.ID, tgbotapi.FilePath(filePath))
-
-	// 设置回复到原消息
-	if message.MessageID != 0 {
-		doc.ReplyToMessageID = message.MessageID
-	}
-
-	// 设置文件说明
-	doc.Caption = "这是您请求的数据文件"
-
-	// 发送文件
-	b.sendWithLog(doc, "document reply")
-	return
+	return nil
 }
 
 // sendWithLog 统一处理消息发送和错误日志

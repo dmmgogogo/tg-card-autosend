@@ -2,6 +2,7 @@ package main
 
 import (
 	"tg-card-autosed/bot"
+	"tg-card-autosed/lib"
 	"tg-card-autosed/models"
 	_ "tg-card-autosed/routers"
 
@@ -15,6 +16,7 @@ func main() {
 	// 初始化必要组件
 	initLog()
 	initDb()
+	lib.InitRedis()
 	initTemplate()
 
 	// 启动机器人
@@ -39,12 +41,11 @@ func initBots() {
 		Token:           Token,
 		TargetChatID:    TargetChatID,
 		StartCmdMessage: "",
-		Keywords:        "",
+		Keywords:        web.AppConfig.DefaultString("keywords", ""),
 		ExpiresAt:       1914339200,
 		Status:          1,
 	}
-	// bot.InitGlobalBot(botConfig) // 单个机器人
-	bot.StartAll([]*models.Bot{botConfig}) // 多个机器人，待监听
+	bot.StartAll([]*models.Bot{botConfig})
 }
 
 func initTemplate() {
