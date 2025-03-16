@@ -167,6 +167,9 @@ func (b *Bot) handleCallbackQuery(botAdmin, sendUserName string, sendUserId int6
 	command := callback.Data
 	logs.Debug("🤖机器人[%s]收到回调查询: %s", b.config.Name, command)
 
+	// 创建回调应答
+	callback_response := tgbotapi.NewCallback(callback.ID, "")
+
 	if command == "search_how_many_card" {
 		// 查询库存
 		mAppCard := models.AppCard{}
@@ -174,17 +177,26 @@ func (b *Bot) handleCallbackQuery(botAdmin, sendUserName string, sendUserId int6
 		if err != nil {
 			logs.Error("查询库存失败: %v", err)
 			sendMessage(b.api, callback.Message.Chat.ID, "查询库存失败")
-			return
+			callback_response.Text = "查询失败"
+		} else {
+			sendMessage(b.api, callback.Message.Chat.ID, fmt.Sprintf("当前库存数量: %d", num))
+			callback_response.Text = "查询成功"
 		}
-		sendMessage(b.api, callback.Message.Chat.ID, fmt.Sprintf("当前库存数量: %d", num))
 	} else if command == "open_take_number" {
 		// 切换拿号命令
 		_, _ = lib.RedisClient.Set(context.Background(), conf.BotStatusKey, "1", 0).Result()
 		sendMessage(b.api, callback.Message.Chat.ID, "🟢 开启拿号命令成功")
+		callback_response.Text = "已开启"
 	} else if command == "stop_take_number" {
 		// 停止拿号命令
 		_, _ = lib.RedisClient.Set(context.Background(), conf.BotStatusKey, "0", 0).Result()
 		sendMessage(b.api, callback.Message.Chat.ID, "🔴 停止拿号命令成功")
+		callback_response.Text = "已停止"
+	}
+
+	// 响应回调查询
+	if _, err := b.api.Request(callback_response); err != nil {
+		logs.Error("回调响应失败: %v", err)
 	}
 }
 
