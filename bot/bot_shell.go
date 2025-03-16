@@ -117,46 +117,46 @@ func (b *Bot) Start() error {
 
 	b.updates = b.api.GetUpdatesChan(u)
 
-	log.Printf("消息转发Bot [%s] 已启动...", b.config.Name)
+	logs.Debug("消息转发Bot [%s] 已启动...", b.config.Name)
 
+	// 获取机器人管理员
+	botAdmin := web.AppConfig.DefaultString("bot_admin", "")
+	if botAdmin == "" {
+		logs.Error("🤖机器人[%s]管理员未设置", b.config.Name)
+		return nil
+	}
+
+	// 开始监听全部消息
 	for {
 		select {
 		case <-b.stopChan:
-			log.Printf("消息转发Bot [%s] 已停止...", b.config.Name)
+			logs.Debug("消息转发Bot [%s] 已停止...", b.config.Name)
 			return nil
 		case update, ok := <-b.updates:
 			if !ok {
 				return nil
 			}
-			if update.Message == nil {
-				continue
-			}
 
-			log.Printf("[%s] 收到消息: MessageID: [%d] %s (from-username: %s,from-id: %v, chat_id: %d)",
-				b.config.Name,
-				update.Message.MessageID,
-				update.Message.Text,
-				update.Message.From.UserName,
-				update.Message.From.ID,
-				update.Message.Chat.ID)
-
-			// 获取机器人管理员
-			botAdmin := web.AppConfig.DefaultString("bot_admin", "")
-			if botAdmin == "" {
-				logs.Error("🤖机器人[%s]管理员未设置", b.config.Name)
-				return nil
-			}
-
-			logs.Debug("🤖机器人: [%v] ==> [%v]", update.Message.IsCommand(), update.CallbackQuery)
-
-			// 处理各种类型的消息
-			if update.Message.IsCommand() {
-				b.handleAdminCommand(botAdmin, update.Message.From.UserName, update.Message.From.ID, update.Message)
-			} else if update.CallbackQuery != nil {
+			// 这里是处理回调查询
+			if update.CallbackQuery != nil {
 				b.handleCallbackQuery(botAdmin, update.CallbackQuery.From.UserName, update.CallbackQuery.From.ID, update.CallbackQuery)
-			} else {
-				// 处理文本消息
-				b.handleCommand(botAdmin, update.Message.From.UserName, update.Message.From.ID, update.Message)
+			} else if update.Message != nil {
+				// 这里是处理普通消息
+				logs.Debug("[%s] 收到[普通]消息: MessageID: [%d] %s (from-username: %s,from-id: %v, chat_id: %d)",
+					b.config.Name,
+					update.Message.MessageID,
+					update.Message.Text,
+					update.Message.From.UserName,
+					update.Message.From.ID,
+					update.Message.Chat.ID)
+
+				// 处理各种类型的消息
+				if update.Message.IsCommand() {
+					b.handleAdminCommand(botAdmin, update.Message.From.UserName, update.Message.From.ID, update.Message)
+				} else {
+					// 处理文本消息
+					b.handleCommand(botAdmin, update.Message.From.UserName, update.Message.From.ID, update.Message)
+				}
 			}
 		}
 	}
@@ -165,7 +165,7 @@ func (b *Bot) Start() error {
 // handleCallbackQuery 处理回调查询
 func (b *Bot) handleCallbackQuery(botAdmin, sendUserName string, sendUserId int64, callback *tgbotapi.CallbackQuery) {
 	command := callback.Data
-	log.Printf("🤖机器人[%s]收到回调查询: %s", b.config.Name, command)
+	logs.Debug("🤖机器人[%s]收到回调查询: %s", b.config.Name, command)
 
 	if command == "search_how_many_card" {
 		// 查询库存
