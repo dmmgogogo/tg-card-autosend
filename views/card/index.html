@@ -1,0 +1,187 @@
+<div class="card-manager">
+    <div class="header">
+        <h2>卡密管理系统</h2>
+    </div>
+
+    <div class="tab-content">
+        <div class="tab-header">
+            <button class="tab-btn active" id="cardsTab" onclick="switchTab('cards')">卡密列表</button>
+            <button class="tab-btn" id="historyTab" onclick="switchTab('history')">购买记录</button>
+        </div>
+
+        <!-- 卡密列表 -->
+        <div id="cardsPane" class="tab-pane active">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th width="80">ID</th>
+                        <th>内容</th>
+                        <th width="100">状态</th>
+                        <th width="180">创建时间</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .Cards}}
+                    <tr>
+                        <td>{{.Id}}</td>
+                        <td>{{.Txt}}</td>
+                        <td>
+                            <span class="status-badge {{if eq .Status 0}}status-unused{{else}}status-used{{end}}">
+                                {{if eq .Status 0}}未使用{{else}}已使用{{end}}
+                            </span>
+                        </td>
+                        <td>{{.Createtime.Format "2006-01-02 15:04:05"}}</td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+            
+            <div class="pagination">
+                {{if gt .CardPage 1}}
+                <a href="?page={{subtract .CardPage 1}}" class="page-btn">上一页</a>
+                {{end}}
+                <span class="page-info">第 {{.CardPage}} 页</span>
+                {{if .HasNextCard}}
+                <a href="?page={{add .CardPage 1}}" class="page-btn">下一页</a>
+                {{end}}
+            </div>
+        </div>
+
+        <!-- 购买记录 -->
+        <div id="historyPane" class="tab-pane">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th width="80">ID</th>
+                        <th>购买人</th>
+                        <th>购买ID</th>
+                        <th width="180">购买时间</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .Histories}}
+                    <tr>
+                        <td>{{.Id}}</td>
+                        <td>{{.Name}}</td>
+                        <td>{{.TxtIds}}</td>
+                        <td>{{.Createtime.Format "2006-01-02 15:04:05"}}</td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+            
+            <div class="pagination">
+                {{if gt .HistoryPage 1}}
+                <a href="?historyPage={{subtract .HistoryPage 1}}" class="page-btn">上一页</a>
+                {{end}}
+                <span class="page-info">第 {{.HistoryPage}} 页</span>
+                {{if .HasNextHistory}}
+                <a href="?historyPage={{add .HistoryPage 1}}" class="page-btn">下一页</a>
+                {{end}}
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.tab-header {
+    margin-bottom: 20px;
+    border-bottom: 1px solid #ddd;
+}
+
+.tab-btn {
+    padding: 10px 20px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 16px;
+    color: #666;
+}
+
+.tab-btn.active {
+    color: #409eff;
+    border-bottom: 2px solid #409eff;
+}
+
+.tab-pane {
+    display: none;
+}
+
+.tab-pane.active {
+    display: block;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+}
+
+.data-table th,
+.data-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+}
+
+.data-table th {
+    background: #f5f7fa;
+    font-weight: 500;
+}
+
+.status-badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.status-unused {
+    background: #e1f3d8;
+    color: #67c23a;
+}
+
+.status-used {
+    background: #fef0f0;
+    color: #f56c6c;
+}
+
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.page-btn {
+    padding: 8px 16px;
+    border: 1px solid #ddd;
+    background: white;
+    cursor: pointer;
+    border-radius: 4px;
+    text-decoration: none;
+    color: #666;
+}
+
+.page-btn:hover {
+    background: #f5f5f5;
+}
+
+.page-info {
+    color: #666;
+}
+</style>
+
+<script>
+function switchTab(tab) {
+    // 更新按钮状态
+    document.getElementById('cardsTab').classList.remove('active');
+    document.getElementById('historyTab').classList.remove('active');
+    document.getElementById(tab + 'Tab').classList.add('active');
+    
+    // 更新内容显示
+    document.getElementById('cardsPane').classList.remove('active');
+    document.getElementById('historyPane').classList.remove('active');
+    document.getElementById(tab + 'Pane').classList.add('active');
+}
+</script> 
