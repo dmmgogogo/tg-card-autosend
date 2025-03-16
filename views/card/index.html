@@ -46,7 +46,7 @@
                     <span class="badge bg-secondary">已使用</span>
                   {{end}}
                 </td>
-                <td>{{.Createtime.Format "2006-01-02 15:04:05"}}</td>
+                <td>{{FormatTime .Createtime}}</td>
               </tr>
               {{end}}
             {{else}}
@@ -100,8 +100,8 @@
               <tr>
                 <td>{{.Id}}</td>
                 <td>{{.Name}}</td>
-                <td>{{.TxtIds}}</td>
-                <td>{{.Createtime.Format "2006-01-02 15:04:05"}}</td>
+                <td>{{.UsedTxt}}</td>
+                <td>{{FormatTime .Createtime}}</td>
               </tr>
               {{end}}
             {{else}}

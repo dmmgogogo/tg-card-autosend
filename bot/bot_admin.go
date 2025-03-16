@@ -296,9 +296,12 @@ func handleListCommand(api *tgbotapi.BotAPI, chatID int64) {
 	sendMessage(api, chatID, msg.String())
 }
 
-func sendMessage(api *tgbotapi.BotAPI, chatID int64, text string) {
+func sendMessage(api *tgbotapi.BotAPI, chatID int64, text string, isAdmin ...string) {
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ParseMode = tgbotapi.ModeMarkdown
+	if len(isAdmin) > 0 && isAdmin[0] == "yes" {
+		msg.ReplyMarkup = generateKeyboard()
+	}
 	if _, err := api.Send(msg); err != nil {
 		log.Printf("Failed to send message: %v", err)
 	}

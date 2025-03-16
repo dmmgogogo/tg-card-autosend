@@ -5,6 +5,7 @@ import (
 	"tg-card-autosed/lib"
 	"tg-card-autosed/models"
 	_ "tg-card-autosed/routers"
+	"time"
 
 	"github.com/beego/beego/v2/client/orm"
 	"github.com/beego/beego/v2/core/logs"
@@ -55,6 +56,10 @@ func initTemplate() {
 	})
 	web.AddFuncMap("subtract", func(a, b int) int {
 		return a - b
+	})
+
+	web.AddFuncMap("FormatTime", func(timestamp int64) string {
+		return time.Unix(timestamp, 0).Format("2006-01-02 15:04:05")
 	})
 
 	// 设置模板路径

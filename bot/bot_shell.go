@@ -38,24 +38,6 @@ var (
 	globalBot *Bot
 )
 
-// 机器人帮助信息
-const helpBotText = `👏🏻 欢迎使用本机器人！
-
-📝 使用说明：
-1️⃣， 在拿号群主中发送 数字+fb 格式的命令获取
-数据， 
-
-例如：5fb,10fb,15fb(最大400fb)
-
-📊当前状态：
-拿号命令：🟢已开启 ❌已关闭
-
-2️⃣ */help*
-   ❓ 显示本帮助信息
-`
-
-const helpBotTextAdmin = `🛠️管理员控制面板`
-
 // InitGlobalBot 初始化全局机器人
 func InitGlobalBot(config *models.Bot) {
 	var err error
@@ -158,26 +140,111 @@ func (b *Bot) Start() error {
 				update.Message.From.ID,
 				update.Message.Chat.ID)
 
-			if update.Message.IsCommand() {
-				cmd := update.Message.Command()
-				// args := update.Message.CommandArguments()
+			// 获取机器人管理员
+			botAdmin := web.AppConfig.DefaultString("bot_admin", "")
+			if botAdmin == "" {
+				logs.Error("🤖机器人[%s]管理员未设置", b.config.Name)
+				return nil
+			}
 
-				switch cmd {
-				case "start", "help":
-					sendMessage(b.api, update.Message.Chat.ID, helpBotText)
-				default:
-					sendMessage(b.api, update.Message.Chat.ID, "❌ 未知命令，请使用 /help 查看支持的命令")
-				}
+			logs.Debug("🤖机器人: [%v] ==> [%v]", update.Message.IsCommand(), update.CallbackQuery)
+
+			// 处理各种类型的消息
+			if update.Message.IsCommand() {
+				b.handleAdminCommand(botAdmin, update.Message.From.UserName, update.Message.From.ID, update.Message)
+			} else if update.CallbackQuery != nil {
+				b.handleCallbackQuery(botAdmin, update.CallbackQuery.From.UserName, update.CallbackQuery.From.ID, update.CallbackQuery)
 			} else {
 				// 处理文本消息
-				b.handleCommand(update.Message.From.UserName, update.Message.From.ID, update.Message)
+				b.handleCommand(botAdmin, update.Message.From.UserName, update.Message.From.ID, update.Message)
 			}
 		}
 	}
 }
 
-// handleCommand 处理命令消息
-func (b *Bot) handleCommand(sendUserName string, sendUserId int64, message *tgbotapi.Message) {
+// handleCallbackQuery 处理回调查询
+func (b *Bot) handleCallbackQuery(botAdmin, sendUserName string, sendUserId int64, callback *tgbotapi.CallbackQuery) {
+	command := callback.Data
+	log.Printf("🤖机器人[%s]收到回调查询: %s", b.config.Name, command)
+
+	if command == "search_how_many_card" {
+		// 查询库存
+		mAppCard := models.AppCard{}
+		num, err := mAppCard.GetCardLeft()
+		if err != nil {
+			logs.Error("查询库存失败: %v", err)
+			sendMessage(b.api, callback.Message.Chat.ID, "查询库存失败")
+			return
+		}
+		sendMessage(b.api, callback.Message.Chat.ID, fmt.Sprintf("当前库存数量: %d", num))
+	} else if command == "open_take_number" {
+		// 切换拿号命令
+		_, _ = lib.RedisClient.Set(context.Background(), conf.BotStatusKey, "1", 0).Result()
+		sendMessage(b.api, callback.Message.Chat.ID, "🟢 开启拿号命令成功")
+	} else if command == "stop_take_number" {
+		// 停止拿号命令
+		_, _ = lib.RedisClient.Set(context.Background(), conf.BotStatusKey, "0", 0).Result()
+		sendMessage(b.api, callback.Message.Chat.ID, "🔴 停止拿号命令成功")
+	}
+}
+
+// handleAdminCommand 处理管理员命令
+func (b *Bot) handleAdminCommand(botAdmin, sendUserName string, sendUserId int64, message *tgbotapi.Message) {
+	cmd := message.Command()
+	// args := update.Message.CommandArguments()
+
+	switch cmd {
+	case "start", "help":
+		// 查询库存	// 获取当前机器人状态
+		redisStatus, err := lib.RedisClient.Get(context.Background(), conf.BotStatusKey).Result()
+		if err != nil && err != redis.Nil {
+			logs.Error("获取机器人状态失败: %v", err)
+			return
+		}
+
+		cmdText := ""
+		if redisStatus == "0" {
+			cmdText = "🔴 已暂停"
+		} else {
+			cmdText = "🟢 启动中"
+		}
+
+		// 机器人帮助信息
+		helpBotText := `👏🏻 欢迎使用本机器人！
+
+📝 使用说明：
+1️⃣， 在拿号群主中发送 数字+fb 格式的命令获取
+数据， 
+
+例如：5fb,10fb,15fb(最大400fb)
+
+📊当前状态：
+拿号命令：` + cmdText + `
+
+2️⃣ */help*
+❓ 显示本帮助信息
+`
+
+		var (
+			returnText = helpBotText
+			isAdmin    string // 是否是管理员
+		)
+		if message.From.UserName == botAdmin {
+			// 添加管理员命令
+			returnText += `
+			
+			
+🛠️管理员控制面板`
+			isAdmin = "yes"
+		}
+		sendMessage(b.api, message.Chat.ID, returnText, isAdmin)
+	default:
+		sendMessage(b.api, message.Chat.ID, "❌ 未知命令，请使用 /help 查看支持的命令")
+	}
+}
+
+// handleCommand 处理普通消息
+func (b *Bot) handleCommand(botAdmin, sendUserName string, sendUserId int64, message *tgbotapi.Message) {
 	if b.config.ExpiresAt < time.Now().Unix() {
 		log.Printf("🤖机器人[%s]已过期", b.config.Name)
 		return
@@ -232,7 +299,7 @@ func (b *Bot) handleCommand(sendUserName string, sendUserId int64, message *tgbo
 			status, err := lib.RedisClient.Get(context.Background(), conf.BotStatusKey).Result()
 			if err != nil && err != redis.Nil {
 				log.Printf("🤖机器人[%s]获取机器人状态失败: %s", b.config.Name, err)
-				sendMessage(b.api, message.Chat.ID, "机器人已暂停⏸服务, 请联系管理员")
+				sendMessage(b.api, message.Chat.ID, "机器人已暂停⏸服务, 请联系管理员 @"+botAdmin)
 				return
 			}
 
@@ -240,7 +307,7 @@ func (b *Bot) handleCommand(sendUserName string, sendUserId int64, message *tgbo
 
 			// 5. 如果机器人状态为关闭，则返回错误
 			if status == "0" {
-				sendMessage(b.api, message.Chat.ID, "机器人已关闭, 请联系管理员")
+				sendMessage(b.api, message.Chat.ID, "机器人已关闭, 请联系管理员 @"+botAdmin)
 				return
 			}
 
@@ -258,12 +325,12 @@ func (b *Bot) handleCommand(sendUserName string, sendUserId int64, message *tgbo
 			items, err := mAppCard.GetCardLimit(int(numberInt))
 			if err != nil {
 				log.Printf("🤖机器人[%s]获取卡密失败: %s", b.config.Name, err)
-				sendMessage(b.api, message.Chat.ID, "获取卡密失败，请联系管理员")
+				sendMessage(b.api, message.Chat.ID, "获取卡密失败，请联系管理员 @"+botAdmin)
 				return
 			}
 
 			if len(items) != int(numberInt) {
-				sendMessage(b.api, message.Chat.ID, "卡密不足，请联系管理员")
+				sendMessage(b.api, message.Chat.ID, "卡密不足，请联系管理员 @"+botAdmin)
 				return
 			}
 
@@ -272,7 +339,7 @@ func (b *Bot) handleCommand(sendUserName string, sendUserId int64, message *tgbo
 			err = generateCardFile(fileName, items)
 			if err != nil {
 				logs.Error("生成文件失败: %v", err)
-				sendMessage(b.api, message.Chat.ID, "生成文件失败，请联系管理员")
+				sendMessage(b.api, message.Chat.ID, "生成文件失败，请联系管理员 @"+botAdmin)
 				return
 			}
 			// 删除临时文件
@@ -470,15 +537,9 @@ func EscapeMarkdownV2(text string) string {
 
 // 生成动态按钮
 func generateKeyboard() tgbotapi.InlineKeyboardMarkup {
-	var takeNumberText, sellAfterText string
-	takeNumberText = "🟢 启动拿号命令"
-	sellAfterText = "🟢 启动售后命令"
-
-	// if commandStatus["take_number"] {
-	// 	takeNumberText = "🟢 启动拿号命令"
-	// } else {
-	// 	takeNumberText = "🔴 暂停拿号命令"
-	// }
+	// var takeNumberText, sellAfterText string
+	// takeNumberText = "🟢 启动拿号命令"
+	// sellAfterText = "🟢 启动售后命令"
 
 	// if commandStatus["sell_after"] {
 	// 	sellAfterText = "🟢 启动售后命令"
@@ -489,8 +550,11 @@ func generateKeyboard() tgbotapi.InlineKeyboardMarkup {
 	// 创建按钮
 	buttons := [][]tgbotapi.InlineKeyboardButton{
 		{
-			tgbotapi.NewInlineKeyboardButtonData(takeNumberText, "toggle_take_number"),
-			tgbotapi.NewInlineKeyboardButtonData(sellAfterText, "toggle_sell_after"),
+			tgbotapi.NewInlineKeyboardButtonData("📊 查询库存", "search_how_many_card"),
+		},
+		{
+			tgbotapi.NewInlineKeyboardButtonData("🟢 启动拿号命令", "open_take_number"),
+			tgbotapi.NewInlineKeyboardButtonData("🔴 暂停拿号命令", "stop_take_number"),
 		},
 	}
 

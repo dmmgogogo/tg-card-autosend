@@ -123,7 +123,7 @@ func (c *CardController) UploadCard() {
 		card := &models.AppCard{
 			Txt:        line,
 			Status:     0, // 未使用状态
-			Createtime: time.Now(),
+			Createtime: time.Now().Unix(),
 		}
 
 		if _, err := tx.Insert(card); err != nil {

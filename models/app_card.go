@@ -9,18 +9,18 @@ import (
 
 // AppCard 卡密记录
 type AppCard struct {
-	Id         int64     `orm:"auto;pk"`
-	Txt        string    `orm:"size(100);unique"`
-	Status     int       `orm:"default(0)"`
-	Createtime time.Time `orm:"auto_now_add;type(datetime)"`
+	Id         int64  `orm:"auto;pk"`
+	Txt        string `orm:"size(100);unique"`
+	Status     int    `orm:"default(0)"`
+	Createtime int64  `orm:"index"`
 }
 
 type AppCardHistory struct {
-	Id         int64     `orm:"auto;pk"`
-	UserId     int64     `orm:"size(100)"`
-	UserName   string    `orm:"size(100)"`
-	TxtIds     string    `orm:"size(100)"`
-	Createtime time.Time `orm:"auto_now_add;type(datetime)"`
+	Id         int64  `orm:"auto;pk"`
+	UserId     int64  `orm:"size(100)"`
+	UserName   string `orm:"size(100)"`
+	UsedTxt    string `orm:"size(100)"`
+	Createtime int64  `orm:"index"`
 }
 
 func (c *AppCard) TableName() string {
@@ -33,6 +33,14 @@ func (h *AppCardHistory) TableName() string {
 
 func init() {
 	orm.RegisterModel(new(AppCard), new(AppCardHistory))
+}
+
+// GetCardLeft 获取卡密记录里面status=0的记录条数
+func (c *AppCard) GetCardLeft() (num int64, err error) {
+	o := orm.NewOrm()
+	qs := o.QueryTable(c)
+	num, err = qs.Filter("status", 0).Count()
+	return num, err
 }
 
 // GetCardLimit 获取卡密记录
@@ -61,8 +69,8 @@ func (h *AppCardHistory) InsertCardHistory(userId int64, userName string, items 
 		historys = append(historys, &AppCardHistory{
 			UserId:     userId,
 			UserName:   userName,
-			TxtIds:     item.Txt,
-			Createtime: time.Now(),
+			UsedTxt:    item.Txt,
+			Createtime: time.Now().Unix(),
 		})
 
 	}
