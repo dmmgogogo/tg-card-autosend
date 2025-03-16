@@ -1,4 +1,4 @@
 #!/bin/bash
 
-GOOS=linux GOARCH=amd64 go build -o tg-auto-card-num main.go
-zip tg-auto-card-num.zip tg-auto-card-num
+GOOS=linux GOARCH=amd64 go build -o tg-card-autosed main.go
+zip tg-card-autosed.zip tg-card-autosed

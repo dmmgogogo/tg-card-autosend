@@ -1,7 +1,9 @@
 package main
 
 import (
-	_ "tg-auto-card-num/routers"
+	"tg-card-autosed/bot"
+	"tg-card-autosed/models"
+	_ "tg-card-autosed/routers"
 
 	"github.com/beego/beego/v2/client/orm"
 	"github.com/beego/beego/v2/core/logs"
@@ -10,12 +12,39 @@ import (
 )
 
 func main() {
+	// 初始化必要组件
 	initLog()
 	initDb()
 	initTemplate()
 
+	// 启动机器人
+	initBots()
+
 	logs.Info("启动 web 服务")
 	web.Run()
+}
+
+// 初始化机器人
+func initBots() {
+	Token := web.AppConfig.DefaultString("bot_token", "")
+	TargetChatID := web.AppConfig.DefaultInt64("bot_chatid", 0)
+	if Token == "" || TargetChatID == 0 {
+		logs.Error("Bot token or chat ID is not set")
+		return
+	}
+
+	botConfig := &models.Bot{
+		ID:              1,
+		Name:            web.AppConfig.DefaultString("bot_name", ""),
+		Token:           Token,
+		TargetChatID:    TargetChatID,
+		StartCmdMessage: "",
+		Keywords:        "",
+		ExpiresAt:       1914339200,
+		Status:          1,
+	}
+	// bot.InitGlobalBot(botConfig) // 单个机器人
+	bot.StartAll([]*models.Bot{botConfig}) // 多个机器人，待监听
 }
 
 func initTemplate() {
@@ -26,6 +55,9 @@ func initTemplate() {
 	web.AddFuncMap("subtract", func(a, b int) int {
 		return a - b
 	})
+
+	// 设置模板路径
+	web.BConfig.WebConfig.ViewsPath = "views"
 }
 
 func initLog() {

@@ -6,11 +6,12 @@ import (
 	"github.com/beego/beego/v2/client/orm"
 )
 
+// AppCard 卡密记录
 type AppCard struct {
-	Id         int64     `json:"id"`
-	Txt        string    `json:"txt"`
-	Status     int       `json:"status"`
-	Createtime time.Time `json:"createtime"`
+	Id         int64     `orm:"auto;pk"`
+	Txt        string    `orm:"size(100);unique"`
+	Status     int       `orm:"default(0)"`
+	Createtime time.Time `orm:"auto_now_add;type(datetime)"`
 }
 
 type AppCardHistory struct {

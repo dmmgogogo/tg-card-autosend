@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"tg-auto-card-num/models"
+	"tg-card-autosed/models"
 	"time"
 
 	"github.com/beego/beego/v2/client/orm"
